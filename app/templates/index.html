@@ -1,0 +1,2231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Information Retrieval System</title>
+    <style>
+        /* ====================================================================
+           RESET AND BASE STYLES
+           ==================================================================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --secondary-color: #64748b;
+            --success-color: #16a34a;
+            --danger-color: #dc2626;
+            --warning-color: #ea580c;
+            --dark-bg: #0f172a;
+            --light-bg: #f8fafc;
+            --card-bg: #ffffff;
+            --card-bg-dark: #1e293b;
+            --border-color: #e2e8f0;
+            --border-color-dark: #334155;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --text-light: #ffffff;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--light-bg);
+            color: var(--text-primary);
+            line-height: 1.6;
+            transition: var(--transition);
+        }
+
+        body.dark-mode {
+            background-color: var(--dark-bg);
+            color: var(--text-light);
+        }
+
+        /* ====================================================================
+           HEADER AND NAVIGATION
+           ==================================================================== */
+        .header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #1e40af 100%);
+            color: white;
+            padding: 1.5rem 2rem;
+            box-shadow: var(--shadow-md);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .header-title svg {
+            width: 32px;
+            height: 32px;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .theme-toggle {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .theme-toggle:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .stats-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.5rem 1rem;
+            border-radius: 1rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .docs-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+        }
+
+        .docs-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* ====================================================================
+           DOCUMENTS PANEL STYLES
+           ==================================================================== */
+        .docs-panel {
+            position: fixed;
+            left: -400px;
+            top: 0;
+            width: 400px;
+            height: 100vh;
+            background: var(--card-bg);
+            box-shadow: var(--shadow-lg);
+            transition: left 0.3s ease-out;
+            z-index: 1500;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-color);
+        }
+
+        body.dark-mode .docs-panel {
+            background: var(--card-bg-dark);
+            border-right-color: var(--border-color-dark);
+        }
+
+        .docs-panel.open {
+            left: 0;
+        }
+
+        .docs-panel-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(135deg, var(--primary-color) 0%, #1e40af 100%);
+            color: white;
+        }
+
+        body.dark-mode .docs-panel-header {
+            border-bottom-color: var(--border-color-dark);
+        }
+
+        .docs-panel-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .docs-panel-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .docs-panel-close:hover {
+            transform: scale(1.2);
+        }
+
+        .docs-panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .docs-empty {
+            text-align: center;
+            padding: 2rem 1rem;
+            color: var(--text-secondary);
+        }
+
+        .docs-empty svg {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 1rem;
+            opacity: 0.5;
+        }
+
+        .docs-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .doc-item {
+            background: var(--light-bg);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-color);
+            transition: var(--transition);
+        }
+
+        body.dark-mode .doc-item {
+            background: var(--dark-bg);
+            border-color: var(--border-color-dark);
+        }
+
+        .doc-item:hover {
+            border-color: var(--primary-color);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .doc-item-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            font-size: 0.95rem;
+            word-break: break-word;
+        }
+
+        body.dark-mode .doc-item-title {
+            color: var(--text-light);
+        }
+
+        .doc-item-info {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        .doc-item-info-line {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .doc-item-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .doc-action-btn {
+            flex: 1;
+            min-width: 70px;
+            padding: 0.5rem 0.75rem;
+            border: none;
+            border-radius: 0.4rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.3rem;
+        }
+
+        .doc-view-btn {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .doc-view-btn:hover {
+            background: var(--primary-hover);
+            transform: translateY(-2px);
+        }
+
+        .doc-edit-btn {
+            background: var(--warning-color);
+            color: white;
+        }
+
+        .doc-edit-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+
+        .doc-delete-btn {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .doc-delete-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+
+        .docs-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0);
+            z-index: 1400;
+            transition: background 0.3s ease;
+        }
+
+        .docs-overlay.show {
+            display: block;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        /* ====================================================================
+           EDIT DOCUMENT MODAL
+           ==================================================================== */
+        .edit-modal {
+            display: none;
+            position: fixed;
+            z-index: 2100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        .edit-modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .edit-modal-content {
+            background: var(--card-bg);
+            border-radius: 1rem;
+            box-shadow: var(--shadow-xl);
+            max-width: 600px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            animation: slideUp 0.3s ease-out;
+            padding: 2rem;
+        }
+
+        body.dark-mode .edit-modal-content {
+            background: var(--card-bg-dark);
+        }
+
+        .edit-modal-header {
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .edit-modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        body.dark-mode .edit-modal-title {
+            color: var(--text-light);
+        }
+
+        .edit-modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: var(--transition);
+        }
+
+        .edit-modal-close:hover {
+            color: var(--text-primary);
+            transform: scale(1.2);
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        body.dark-mode .form-group label {
+            color: var(--text-light);
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            font-family: inherit;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            background: var(--light-bg);
+            transition: var(--transition);
+        }
+
+        body.dark-mode .form-group input,
+        body.dark-mode .form-group textarea {
+            background: var(--dark-bg);
+            color: var(--text-light);
+            border-color: var(--border-color-dark);
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 300px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .form-btn {
+            flex: 1;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 0.9rem;
+        }
+
+        .form-btn-save {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .form-btn-save:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+
+        .form-btn-cancel {
+            background: var(--secondary-color);
+            color: white;
+        }
+
+        .form-btn-cancel:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+
+        @media (max-width: 768px) {
+            .header-controls {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+
+            .docs-panel {
+                width: 300px;
+                left: -300px;
+            }
+
+            .doc-action-btn {
+                min-width: 60px;
+                padding: 0.4rem 0.5rem;
+                font-size: 0.7rem;
+            }
+
+            .doc-item-info {
+                grid-template-columns: 1fr;
+            }
+
+            .edit-modal-content {
+                padding: 1.5rem;
+                width: 95%;
+            }
+
+            .form-group textarea {
+                min-height: 200px;
+            }
+        }
+
+        /* ====================================================================
+           MAIN CONTAINER
+           ==================================================================== */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* ====================================================================
+           UPLOAD SECTION
+           ==================================================================== */
+        .upload-section {
+            background: var(--card-bg);
+            border: 2px dashed var(--border-color);
+            border-radius: 1rem;
+            padding: 3rem;
+            text-align: center;
+            margin-bottom: 3rem;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+
+        body.dark-mode .upload-section {
+            background: var(--card-bg-dark);
+            border-color: var(--border-color-dark);
+        }
+
+        .upload-section:hover {
+            border-color: var(--primary-color);
+            background: rgba(37, 99, 235, 0.02);
+        }
+
+        .upload-section.drag-over {
+            border-color: var(--primary-color);
+            background: rgba(37, 99, 235, 0.1);
+            box-shadow: var(--shadow-md);
+        }
+
+        .upload-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 1rem;
+            color: var(--primary-color);
+        }
+
+        .upload-text h2 {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        body.dark-mode .upload-text h2 {
+            color: var(--text-light);
+        }
+
+        .upload-text p {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+        }
+
+        .upload-input {
+            display: none;
+        }
+
+        .upload-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-block;
+        }
+
+        .upload-btn:hover {
+            background: var(--primary-hover);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+
+        .upload-status {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            display: none;
+        }
+
+        .upload-status.show {
+            display: block;
+        }
+
+        .upload-status.success {
+            background: rgba(22, 163, 74, 0.1);
+            color: var(--success-color);
+            border: 1px solid var(--success-color);
+        }
+
+        .upload-status.error {
+            background: rgba(220, 38, 38, 0.1);
+            color: var(--danger-color);
+            border: 1px solid var(--danger-color);
+        }
+
+        /* ====================================================================
+           SEARCH SECTION
+           ==================================================================== */
+        .search-section {
+            margin-bottom: 3rem;
+        }
+
+        .search-container {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .search-box {
+            flex: 1;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 1rem 1.5rem 1rem 3.5rem;
+            font-size: 1rem;
+            border: 2px solid var(--border-color);
+            border-radius: 0.75rem;
+            background: var(--card-bg);
+            color: var(--text-primary);
+            transition: var(--transition);
+        }
+
+        body.dark-mode .search-input {
+            background: var(--card-bg-dark);
+            color: var(--text-light);
+            border-color: var(--border-color-dark);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 1.2rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            pointer-events: none;
+            width: 20px;
+            height: 20px;
+        }
+
+        .search-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+        }
+
+        .search-btn:hover {
+            background: var(--primary-hover);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+
+        .search-btn:active {
+            transform: translateY(0);
+        }
+
+        .search-btn:disabled {
+            background: var(--secondary-color);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* ====================================================================
+           RESULTS SECTION
+           ==================================================================== */
+        .results-section {
+            margin-top: 2rem;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .results-info {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .result-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            transition: var(--transition);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        body.dark-mode .result-card {
+            background: var(--card-bg-dark);
+            border-color: var(--border-color-dark);
+        }
+
+        .result-card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-4px);
+            border-color: var(--primary-color);
+        }
+
+        .result-rank {
+            display: inline-block;
+            background: var(--primary-color);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            width: fit-content;
+        }
+
+        .result-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+            line-height: 1.4;
+        }
+
+        body.dark-mode .result-title {
+            color: var(--text-light);
+        }
+
+        .result-score {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .score-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--success-color);
+        }
+
+        .score-label {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        .score-bar {
+            flex: 1;
+            height: 6px;
+            background: var(--border-color);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        body.dark-mode .score-bar {
+            background: var(--border-color-dark);
+        }
+
+        .score-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-color), var(--success-color));
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+
+        .result-snippet {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.5;
+            margin-bottom: 1rem;
+            flex: 1;
+            font-style: italic;
+            padding: 0.75rem;
+            background: rgba(100, 116, 139, 0.05);
+            border-radius: 0.5rem;
+            border-left: 3px solid var(--primary-color);
+        }
+
+        body.dark-mode .result-snippet {
+            background: rgba(100, 116, 139, 0.1);
+        }
+
+        .view-doc-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 0.9rem;
+        }
+
+        .view-doc-btn:hover {
+            background: var(--primary-hover);
+            transform: translateX(4px);
+        }
+
+        /* ====================================================================
+           MODAL STYLES
+           ==================================================================== */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 2rem 1rem;
+            overflow-y: auto;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            border-radius: 1rem;
+            box-shadow: var(--shadow-xl);
+            max-width: 1000px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        body.dark-mode .modal-content {
+            background: var(--card-bg-dark);
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            padding: 2rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        body.dark-mode .modal-header {
+            border-bottom-color: var(--border-color-dark);
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        body.dark-mode .modal-title {
+            color: var(--text-light);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: var(--transition);
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+            transform: scale(1.2);
+        }
+
+        .modal-body {
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2rem;
+        }
+
+        .modal-text-section {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .document-text {
+            background: var(--light-bg);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            line-height: 1.8;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+            max-height: 60vh;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        body.dark-mode .document-text {
+            background: var(--dark-bg);
+            color: var(--text-light);
+        }
+
+        .metrics-box {
+            background: var(--light-bg);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        body.dark-mode .metrics-box {
+            background: var(--dark-bg);
+        }
+
+        .metrics-title {
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            font-size: 1rem;
+        }
+
+        body.dark-mode .metrics-title {
+            color: var(--text-light);
+        }
+
+        .metric-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .metric-value {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .top-terms-box {
+            background: var(--light-bg);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            max-height: 50vh;
+            overflow-y: auto;
+        }
+
+        body.dark-mode .top-terms-box {
+            background: var(--dark-bg);
+        }
+
+        .top-terms-title {
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            font-size: 1rem;
+        }
+
+        body.dark-mode .top-terms-title {
+            color: var(--text-light);
+        }
+
+        .term-item {
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            background: var(--card-bg);
+            border-radius: 0.5rem;
+            border-left: 3px solid var(--success-color);
+        }
+
+        body.dark-mode .term-item {
+            background: var(--card-bg-dark);
+        }
+
+        .term-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        body.dark-mode .term-name {
+            color: var(--text-light);
+        }
+
+        .term-weight {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .weight-bar {
+            width: 100%;
+            height: 4px;
+            background: var(--border-color);
+            border-radius: 2px;
+            margin-top: 0.5rem;
+            overflow: hidden;
+        }
+
+        body.dark-mode .weight-bar {
+            background: var(--border-color-dark);
+        }
+
+        .weight-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-color), var(--success-color));
+            border-radius: 2px;
+        }
+
+        @media (max-width: 768px) {
+            .modal-body {
+                grid-template-columns: 1fr;
+            }
+
+            .modal-header {
+                padding: 1.5rem;
+            }
+
+            .modal-body {
+                padding: 1.5rem;
+            }
+
+            .document-text {
+                max-height: 40vh;
+            }
+
+            .top-terms-box {
+                max-height: 30vh;
+            }
+        }
+
+        /* ====================================================================
+           LOADING SPINNER
+           ==================================================================== */
+        .loader {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+        }
+
+        .loader.show {
+            display: block;
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
+        .overlay.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid rgba(37, 99, 235, 0.1);
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loader-text {
+            text-align: center;
+            color: var(--text-primary);
+            margin-top: 1rem;
+            font-weight: 600;
+        }
+
+        body.dark-mode .loader-text {
+            color: var(--text-light);
+        }
+
+        /* ====================================================================
+           EMPTY STATE
+           ==================================================================== */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 1rem;
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        body.dark-mode .empty-state h3 {
+            color: var(--text-light);
+        }
+
+        /* ====================================================================
+           ALERTS
+           ==================================================================== */
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert-error {
+            background: rgba(220, 38, 38, 0.1);
+            color: var(--danger-color);
+            border: 1px solid var(--danger-color);
+        }
+
+        .alert-success {
+            background: rgba(22, 163, 74, 0.1);
+            color: var(--success-color);
+            border: 1px solid var(--success-color);
+        }
+
+        .alert-info {
+            background: rgba(37, 99, 235, 0.1);
+            color: var(--primary-color);
+            border: 1px solid var(--primary-color);
+        }
+
+        /* ====================================================================
+           RESPONSIVE DESIGN
+           ==================================================================== */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .header-container {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+
+            .header-title {
+                justify-content: center;
+            }
+
+            .search-container {
+                flex-direction: column;
+            }
+
+            .search-btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .upload-section {
+                padding: 2rem 1rem;
+            }
+
+            .results-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header-title {
+                font-size: 1.25rem;
+            }
+
+            .result-card {
+                padding: 1rem;
+            }
+
+            .search-input {
+                padding: 0.75rem 1rem 0.75rem 3rem;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-container">
+            <div class="header-title">
+                <svg fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/>
+                </svg>
+                Document IRS System
+            </div>
+            <div class="header-controls">
+                <div class="stats-badge">
+                    <span id="doc-count">—</span> documents
+                </div>
+                <button class="docs-btn" id="docs-btn" title="View all documents">
+                    <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    Documents
+                </button>
+                <button class="theme-toggle" id="theme-toggle">
+                    <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 3v1m0 16v1m9-9h-1m-16 0H1m15.364 1.636l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
+                    Theme
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documents Panel -->
+    <div class="docs-overlay" id="docs-overlay"></div>
+    <div class="docs-panel" id="docs-panel">
+        <div class="docs-panel-header">
+            <h2 class="docs-panel-title">Documents</h2>
+            <button class="docs-panel-close" onclick="closeDocsPanel()">&times;</button>
+        </div>
+        <div class="docs-panel-content">
+            <div class="docs-empty" id="docs-empty" style="display: none;">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                </svg>
+                <p>No documents uploaded yet</p>
+            </div>
+            <div class="docs-list" id="docs-list"></div>
+        </div>
+    </div>
+
+    <script>
+        // Inject initial documents provided by the server to avoid flash on reload
+        window.__INITIAL_DOCS__ = {{ initial_docs | safe if initial_docs is defined else '[]' }};
+    </script>
+
+    <!-- Edit Document Modal -->
+    <div class="edit-modal" id="edit-modal">
+        <div class="edit-modal-content">
+            <div class="edit-modal-header">
+                <h2 class="edit-modal-title">Edit Document</h2>
+                <button class="edit-modal-close" onclick="closeEditModal()">&times;</button>
+            </div>
+            <form id="edit-form" onsubmit="saveDocumentEdit(event)">
+                <div class="form-group">
+                    <label for="edit-title">Document Title</label>
+                    <input type="text" id="edit-title" name="title" required placeholder="Enter document title">
+                </div>
+                <div class="form-group">
+                    <label for="edit-text">Document Content</label>
+                    <textarea id="edit-text" name="text" required placeholder="Enter document content"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="form-btn form-btn-save">Save Changes</button>
+                    <button type="button" class="form-btn form-btn-cancel" onclick="closeEditModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Upload Section -->
+        <div class="upload-section" id="upload-area">
+            <svg class="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+            </svg>
+            <div class="upload-text">
+                <h2>Upload Documents</h2>
+                <p>Drag and drop your PDF or TXT files here, or click to select</p>
+            </div>
+            <button class="upload-btn" id="upload-btn">Choose Files</button>
+            <input type="file" id="upload-input" name="file" class="upload-input" accept=".txt,.pdf" multiple>
+            <div class="upload-status" id="upload-status"></div>
+        </div>
+
+        <!-- Search Section -->
+        <div class="search-section">
+            <div class="search-container">
+                <div class="search-box">
+                    <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <input 
+                        type="text" 
+                        class="search-input" 
+                        id="search-input" 
+                        placeholder="Search documents... (e.g., 'annual report 2024', 'project status')"
+                    >
+                </div>
+                <button class="search-btn" id="search-btn">
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    Search
+                </button>
+            </div>
+        </div>
+
+        <!-- Alerts -->
+        <div class="alert alert-error" id="error-alert"></div>
+        <div class="alert alert-success" id="success-alert"></div>
+        <div class="alert alert-info" id="info-alert"></div>
+
+        <!-- Results Section -->
+        <div class="results-section" id="results-section" style="display: none;">
+            <div class="results-header">
+                <div>
+                    <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem; color: var(--text-primary);">
+                        Search Results
+                    </h3>
+                    <div class="results-info">
+                        <span id="results-count"></span>
+                        <span id="results-time"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="results-grid" id="results-grid"></div>
+        </div>
+
+        <!-- Empty State -->
+        <div class="empty-state" id="empty-state">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <h3>No Search Performed</h3>
+            <p>Upload some documents and use the search bar to get started</p>
+        </div>
+    </div>
+
+    <!-- Document Viewer Modal -->
+    <div class="modal" id="doc-viewer-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modal-title">Document</h2>
+                <button class="modal-close" onclick="closeDocumentViewer()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-text-section">
+                    <h3 style="margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">Document Content</h3>
+                    <div class="document-text" id="document-text">Loading...</div>
+                </div>
+                <div class="modal-sidebar">
+                    <div class="metrics-box">
+                        <div class="metrics-title">IR Metrics</div>
+                        <div class="metric-item">
+                            <span>Text Length:</span>
+                            <span class="metric-value" id="metric-text-length">--</span>
+                        </div>
+                        <div class="metric-item">
+                            <span>Tokens:</span>
+                            <span class="metric-value" id="metric-token-count">--</span>
+                        </div>
+                        <div class="metric-item">
+                            <span>Unique Terms:</span>
+                            <span class="metric-value" id="metric-unique-terms">--</span>
+                        </div>
+                    </div>
+                    <div class="top-terms-box">
+                        <div class="top-terms-title">Top Terms (by TF-IDF)</div>
+                        <div id="top-terms-list">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="overlay" id="overlay"></div>
+    <div class="loader" id="loader">
+        <div class="spinner"></div>
+        <div class="loader-text" id="loader-text">Processing...</div>
+    </div>
+
+    <script>
+        // ====================================================================
+        // CONSTANTS AND STATE
+        // ====================================================================
+        const API_BASE = '/api';
+        const state = {
+            isSearching: false,
+            isUploading: false,
+            currentResults: [],
+            documentCount: 0
+        };
+
+        // ====================================================================
+        // DOM ELEMENT REFERENCES
+        // ====================================================================
+        const uploadArea = document.getElementById('upload-area');
+        const uploadInput = document.getElementById('upload-input');
+        const uploadBtn = document.getElementById('upload-btn');
+        const uploadStatus = document.getElementById('upload-status');
+        const searchInput = document.getElementById('search-input');
+        const searchBtn = document.getElementById('search-btn');
+        const resultsSection = document.getElementById('results-section');
+        const resultsGrid = document.getElementById('results-grid');
+        const resultsCount = document.getElementById('results-count');
+        const resultsTime = document.getElementById('results-time');
+        const emptyState = document.getElementById('empty-state');
+        const overlay = document.getElementById('overlay');
+        const loader = document.getElementById('loader');
+        const loaderText = document.getElementById('loader-text');
+        const themeToggle = document.getElementById('theme-toggle');
+        const docCountBadge = document.getElementById('doc-count');
+        const errorAlert = document.getElementById('error-alert');
+        const successAlert = document.getElementById('success-alert');
+        const infoAlert = document.getElementById('info-alert');
+
+        // Documents panel references
+        const docsBtn = document.getElementById('docs-btn');
+        const docsPanel = document.getElementById('docs-panel');
+        const docsOverlay = document.getElementById('docs-overlay');
+        const docsList = document.getElementById('docs-list');
+        const docsEmpty = document.getElementById('docs-empty');
+
+        // Edit modal references
+        const editModal = document.getElementById('edit-modal');
+        const editForm = document.getElementById('edit-form');
+        const editTitle = document.getElementById('edit-title');
+        const editText = document.getElementById('edit-text');
+
+        // Store current editing document ID
+        let currentEditingDocId = null;
+
+        // ====================================================================
+        // UTILITY FUNCTIONS
+        // ====================================================================
+
+                function renderDocsList(documents) {
+                    if (!documents || documents.length === 0) {
+                        docsEmpty.style.display = 'block';
+                        docsList.innerHTML = '';
+                    } else {
+                        docsEmpty.style.display = 'none';
+                        docsList.innerHTML = documents.map(doc => `
+                            <div class="doc-item">
+                                <div class="doc-item-title">${escapeHtml(doc.title)}</div>
+                                <div class="doc-item-info">
+                                    <div class="doc-item-info-line">
+                                        <span>Tokens:</span>
+                                        <strong>${formatNumber(doc.token_count)}</strong>
+                                    </div>
+                                    <div class="doc-item-info-line">
+                                        <span>Terms:</span>
+                                        <strong>${formatNumber(doc.unique_terms)}</strong>
+                                    </div>
+                                </div>
+                                <div class="doc-item-actions">
+                                    <button class="doc-action-btn doc-view-btn" onclick="viewDocumentFromPanel(${doc.doc_id}, '${escapeHtml(doc.title).replace(/'/g, "\\'")}')">View</button>
+                                    <button class="doc-action-btn doc-edit-btn" onclick="openEditModal(${doc.doc_id}, '${escapeHtml(doc.title).replace(/'/g, "\\'")}')">Edit</button>
+                                    <button class="doc-action-btn doc-delete-btn" onclick="deleteDocumentConfirm(${doc.doc_id}, '${escapeHtml(doc.title).replace(/'/g, "\\'")}')">Delete</button>
+                                </div>
+                            </div>
+                        `).join('');
+                    }
+                }
+
+                function renderInitialDocuments(initialDocs) {
+                    try {
+                        if (!initialDocs) return;
+                        const docs = Array.isArray(initialDocs) ? initialDocs : [];
+                        // Update badge and list synchronously
+                        docCountBadge.textContent = docs.length;
+                        renderDocsList(docs);
+                    } catch (e) {
+                        console.error('Error rendering initial documents:', e);
+                    }
+                }
+
+        /**
+         * Show/hide loading spinner
+         */
+        function setLoading(isLoading, text = 'Processing...') {
+            if (isLoading) {
+                overlay.classList.add('show');
+                loader.classList.add('show');
+                loaderText.textContent = text;
+            } else {
+                overlay.classList.remove('show');
+                loader.classList.remove('show');
+            }
+        }
+
+        /**
+         * Show alert message
+         */
+        function showAlert(type, message, duration = 5000) {
+            let alert;
+            switch (type) {
+                case 'error':
+                    alert = errorAlert;
+                    break;
+                case 'success':
+                    alert = successAlert;
+                    break;
+                case 'info':
+                    alert = infoAlert;
+                    break;
+                default:
+                    return;
+            }
+
+            alert.textContent = message;
+            alert.classList.add('show');
+
+            setTimeout(() => {
+                alert.classList.remove('show');
+            }, duration);
+        }
+
+        /**
+         * Clear all alerts
+         */
+        function clearAlerts() {
+            errorAlert.classList.remove('show');
+            successAlert.classList.remove('show');
+            infoAlert.classList.remove('show');
+        }
+
+        /**
+         * Toggle dark/light theme
+         */
+        function toggleTheme() {
+            document.body.classList.toggle('dark-mode');
+            localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+        }
+
+        /**
+         * Load theme preference from localStorage
+         */
+        function loadTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.body.classList.add('dark-mode');
+            }
+        }
+
+        /**
+         * Update document count
+         */
+        async function updateDocumentCount() {
+            try {
+                const response = await fetch(`${API_BASE}/stats`);
+                const data = await response.json();
+                if (data.success) {
+                    state.documentCount = data.stats.document_count;
+                    docCountBadge.textContent = state.documentCount;
+                }
+            } catch (error) {
+                console.error('Failed to update document count:', error);
+            }
+        }
+
+        // ====================================================================
+        // FILE UPLOAD HANDLERS
+        // ====================================================================
+
+        /**
+         * Handle file upload
+         */
+        async function handleFileUpload(files) {
+            if (files.length === 0) return;
+
+            state.isUploading = true;
+            clearAlerts();
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (const file of files) {
+                try {
+                    setLoading(true, `Uploading: ${file.name}`);
+
+                    const formData = new FormData();
+                    formData.append('file', file, file.name);
+                    console.log('Uploading file', file.name, file.size, file.type);
+                    console.log('FormData keys', Array.from(formData.keys()));
+
+                    const response = await fetch(`${API_BASE}/upload`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (!data.success) {
+                        showAlert('error', `${file.name}: ${data.error}`);
+                        errorCount++;
+                    } else {
+                        successCount++;
+                    }
+                } catch (error) {
+                    showAlert('error', `${file.name}: ${error.message}`);
+                    errorCount++;
+                }
+            }
+
+            setLoading(false);
+            state.isUploading = false;
+
+            if (successCount > 0) {
+                showAlert('success', `Successfully uploaded ${successCount} document(s)`);
+                uploadInput.value = '';
+                uploadStatus.classList.remove('show');
+                updateDocumentCount();
+            }
+
+            if (errorCount > 0 && successCount === 0) {
+                showAlert('error', `Failed to upload ${errorCount} document(s)`);
+            }
+        }
+
+        /**
+         * Handle drag and drop
+         */
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            uploadArea.classList.add('drag-over');
+        }
+
+        function handleDragLeave(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            uploadArea.classList.remove('drag-over');
+        }
+
+        function handleDrop(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            uploadArea.classList.remove('drag-over');
+
+            const files = Array.from(event.dataTransfer.files);
+            const validFiles = files.filter(file => {
+                const ext = file.name.split('.').pop().toLowerCase();
+                return ['txt', 'pdf'].includes(ext);
+            });
+
+            if (validFiles.length !== files.length) {
+                showAlert('error', 'Some files were rejected. Only .txt and .pdf files are allowed.');
+            }
+
+            if (validFiles.length > 0) {
+                handleFileUpload(validFiles);
+            }
+        }
+
+        // ====================================================================
+        // SEARCH HANDLERS
+        // ====================================================================
+
+        /**
+         * Execute search query
+         */
+        async function executeSearch() {
+            const query = searchInput.value.trim();
+
+            if (!query) {
+                showAlert('error', 'Please enter a search query');
+                return;
+            }
+
+            if (state.documentCount === 0) {
+                showAlert('info', 'No documents uploaded yet. Please upload documents first.');
+                return;
+            }
+
+            state.isSearching = true;
+            clearAlerts();
+            setLoading(true, 'Searching...');
+
+            try {
+                const response = await fetch(`${API_BASE}/search`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        top_k: 20
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    showAlert('error', data.error || 'Search failed');
+                    resultsSection.style.display = 'none';
+                    emptyState.style.display = 'block';
+                    return;
+                }
+
+                state.currentResults = data.results;
+
+                if (data.results.length === 0) {
+                    showAlert('info', 'No matching documents found for your query');
+                    resultsSection.style.display = 'none';
+                    emptyState.style.display = 'block';
+                } else {
+                    displayResults(data.results, data.query, data.execution_time_ms);
+                    resultsSection.style.display = 'block';
+                    emptyState.style.display = 'none';
+                }
+            } catch (error) {
+                showAlert('error', `Search error: ${error.message}`);
+                resultsSection.style.display = 'none';
+                emptyState.style.display = 'block';
+            } finally {
+                setLoading(false);
+                state.isSearching = false;
+            }
+        }
+
+        /**
+         * Display search results
+         */
+        function displayResults(results, query, executionTime) {
+            resultsCount.innerHTML = `<strong>${results.length}</strong> result(s) found`;
+            resultsTime.innerHTML = ` • <strong>${executionTime}ms</strong>`;
+
+            resultsGrid.innerHTML = results.map(result => `
+                <div class="result-card">
+                    <div class="result-rank">#${result.rank}</div>
+                    
+                    <div class="result-title">${escapeHtml(result.title)}</div>
+                    
+                    <div class="result-score">
+                        <div class="score-value">${result.score_percent}%</div>
+                        <div class="score-label">Match</div>
+                        <div class="score-bar">
+                            <div class="score-bar-fill" style="width: ${result.score_percent}%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="result-snippet">"${escapeHtml(result.snippet)}"</div>
+                    
+                    <button class="view-doc-btn" onclick="viewDocument(${result.doc_id}, '${escapeHtml(result.title).replace(/'/g, "\\'")}')">
+                        View Document &rarr;
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        /**
+         * Escape HTML special characters
+         */
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ====================================================================
+        // DOCUMENT VIEWER FUNCTIONS
+        // ====================================================================
+
+        /**
+         * View a specific document with term weights
+         */
+        async function viewDocument(docId, title) {
+            const modal = document.getElementById('doc-viewer-modal');
+            setLoading(true, 'Loading document...');
+
+            try {
+                // Fetch document details (with term weights)
+                const detailsResponse = await fetch(`${API_BASE}/document/${docId}`);
+                const detailsData = await detailsResponse.json();
+
+                if (!detailsData.success) {
+                    showAlert('error', 'Failed to load document details');
+                    return;
+                }
+
+                const doc = detailsData.document;
+
+                // Fetch document text content
+                const textResponse = await fetch(`${API_BASE}/document/${docId}/view`);
+                const textData = await textResponse.json();
+
+                if (!textData.success) {
+                    showAlert('error', 'Failed to load document text');
+                    return;
+                }
+
+                // Update modal content
+                document.getElementById('modal-title').textContent = doc.title;
+                document.getElementById('document-text').textContent = textData.text;
+
+                // Update metrics
+                document.getElementById('metric-text-length').textContent = 
+                    formatNumber(doc.text_length) + ' chars';
+                document.getElementById('metric-token-count').textContent = 
+                    formatNumber(doc.token_count);
+                document.getElementById('metric-unique-terms').textContent = 
+                    formatNumber(doc.unique_terms);
+
+                // Display top terms with weights
+                const topTermsList = document.getElementById('top-terms-list');
+                if (doc.top_terms && doc.top_terms.length > 0) {
+                    const maxWeight = doc.top_terms[0][1];
+                    topTermsList.innerHTML = doc.top_terms.map(([term, weight]) => {
+                        const percentage = (weight / maxWeight) * 100;
+                        return `
+                            <div class="term-item">
+                                <div class="term-name">${escapeHtml(term)}</div>
+                                <div class="term-weight">TF-IDF: ${weight.toFixed(4)}</div>
+                                <div class="weight-bar">
+                                    <div class="weight-bar-fill" style="width: ${percentage}%"></div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    topTermsList.innerHTML = '<p style="color: var(--text-secondary);">No terms found</p>';
+                }
+
+                // Show modal
+                modal.classList.add('show');
+                setLoading(false);
+
+            } catch (error) {
+                console.error('Error loading document:', error);
+                showAlert('error', `Failed to load document: ${error.message}`);
+                setLoading(false);
+            }
+        }
+
+        /**
+         * Close document viewer modal
+         */
+        function closeDocumentViewer() {
+            const modal = document.getElementById('doc-viewer-modal');
+            modal.classList.remove('show');
+        }
+
+        // ====================================================================
+        // DOCUMENTS PANEL FUNCTIONS
+        // ====================================================================
+
+        /**
+         * Open documents panel
+         */
+        function openDocsPanel() {
+            docsPanel.classList.add('open');
+            docsOverlay.classList.add('show');
+            loadDocumentsList();
+        }
+
+        /**
+         * Close documents panel
+         */
+        function closeDocsPanel() {
+            docsPanel.classList.remove('open');
+            docsOverlay.classList.remove('show');
+        }
+
+        /**
+         * Load and display documents list
+         */
+        async function loadDocumentsList() {
+            try {
+                setLoading(true, 'Loading documents...');
+                
+                const response = await fetch(`${API_BASE}/documents`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    showAlert('error', 'Failed to load documents');
+                    return;
+                }
+
+                const documents = data.documents;
+
+                if (documents.length === 0) {
+                    docsEmpty.style.display = 'block';
+                    docsList.innerHTML = '';
+                } else {
+                    docsEmpty.style.display = 'none';
+                    docsList.innerHTML = documents.map(doc => `
+                        <div class="doc-item">
+                            <div class="doc-item-title">${escapeHtml(doc.title)}</div>
+                            <div class="doc-item-info">
+                                <div class="doc-item-info-line">
+                                    <span>Tokens:</span>
+                                    <strong>${formatNumber(doc.token_count)}</strong>
+                                </div>
+                                <div class="doc-item-info-line">
+                                    <span>Terms:</span>
+                                    <strong>${formatNumber(doc.unique_terms)}</strong>
+                                </div>
+                            </div>
+                            <div class="doc-item-actions">
+                                <button class="doc-action-btn doc-view-btn" onclick="viewDocumentFromPanel(${doc.doc_id}, '${escapeHtml(doc.title).replace(/'/g, "\\'")}')">
+                                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M12 5c7 0 10.7 5.6 11 6-.3.4-4 6-11 6s-10.7-5.6-11-6c.3-.4 4-6 11-6m0-2C4.2 3 .7 9.6.7 11c0 1.4 3.5 8 11.3 8 7.7 0 11.2-6.6 11.2-8 0-1.4-3.5-8-11.2-8z"/><circle cx="12" cy="11" r="2.5"/></svg>
+                                    View
+                                </button>
+                                <button class="doc-action-btn doc-edit-btn" onclick="openEditModal(${doc.doc_id}, '${escapeHtml(doc.title).replace(/'/g, "\\'")}')">
+                                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/><path d="M20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                                    Edit
+                                </button>
+                                <button class="doc-action-btn doc-delete-btn" onclick="deleteDocumentConfirm(${doc.doc_id}, '${escapeHtml(doc.title).replace(/'/g, "\\'")}')">
+                                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                setLoading(false);
+            } catch (error) {
+                console.error('Error loading documents:', error);
+                showAlert('error', `Failed to load documents: ${error.message}`);
+                setLoading(false);
+            }
+        }
+
+        /**
+         * View document from documents panel
+         */
+        async function viewDocumentFromPanel(docId, title) {
+            closeDocsPanel();
+            await viewDocument(docId, title);
+        }
+
+        /**
+         * Open edit modal for a document
+         */
+        async function openEditModal(docId, title) {
+            try {
+                currentEditingDocId = docId;
+                setLoading(true, 'Loading document...');
+                
+                const response = await fetch(`${API_BASE}/document/${docId}/view`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    showAlert('error', 'Failed to load document');
+                    return;
+                }
+
+                editTitle.value = data.title;
+                editText.value = data.text;
+                
+                editModal.classList.add('show');
+                setLoading(false);
+            } catch (error) {
+                console.error('Error opening edit modal:', error);
+                showAlert('error', `Failed to open edit modal: ${error.message}`);
+                setLoading(false);
+            }
+        }
+
+        /**
+         * Close edit modal
+         */
+        function closeEditModal() {
+            editModal.classList.remove('show');
+            editForm.reset();
+            currentEditingDocId = null;
+        }
+
+        /**
+         * Save document edits
+         */
+        async function saveDocumentEdit(event) {
+            event.preventDefault();
+
+            if (!currentEditingDocId) {
+                showAlert('error', 'No document selected');
+                return;
+            }
+
+            const title = editTitle.value.trim();
+            const text = editText.value.trim();
+
+            if (!title || !text) {
+                showAlert('error', 'Title and content cannot be empty');
+                return;
+            }
+
+            setLoading(true, 'Saving document...');
+            clearAlerts();
+
+            try {
+                const response = await fetch(`${API_BASE}/document/${currentEditingDocId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        title: title,
+                        text: text
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    showAlert('error', `Failed to update document: ${data.error}`);
+                    return;
+                }
+
+                showAlert('success', `Document "${title}" updated successfully`);
+                closeEditModal();
+                updateDocumentCount();
+                loadDocumentsList();
+                setLoading(false);
+            } catch (error) {
+                console.error('Error saving document:', error);
+                showAlert('error', `Failed to save document: ${error.message}`);
+                setLoading(false);
+            }
+        }
+
+        /**
+         * Delete document with confirmation
+         */
+        async function deleteDocumentConfirm(docId, title) {
+            if (!confirm(`Are you sure you want to delete "${title}"? This action cannot be undone.`)) {
+                return;
+            }
+
+            await deleteDocument(docId);
+        }
+
+        /**
+         * Delete a document from the index
+         */
+        async function deleteDocument(docId) {
+            setLoading(true, 'Deleting document...');
+            clearAlerts();
+
+            try {
+                const response = await fetch(`${API_BASE}/document/${docId}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    showAlert('error', `Failed to delete document: ${data.error}`);
+                    return;
+                }
+
+                showAlert('success', `Document deleted successfully`);
+                updateDocumentCount();
+                loadDocumentsList();
+                setLoading(false);
+            } catch (error) {
+                console.error('Error deleting document:', error);
+                showAlert('error', `Failed to delete document: ${error.message}`);
+                setLoading(false);
+            }
+        }
+
+        /**
+         * Format number for display
+         */
+        function formatNumber(num) {
+            return num.toLocaleString();
+        }
+
+        /**
+         * Escape HTML special characters
+         */
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ====================================================================
+        // EVENT LISTENERS
+        // ====================================================================
+
+        // Upload area events
+        uploadArea.addEventListener('dragover', handleDragOver);
+        uploadArea.addEventListener('dragleave', handleDragLeave);
+        uploadArea.addEventListener('drop', handleDrop);
+        uploadArea.addEventListener('click', () => uploadInput.click());
+
+        uploadBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            uploadInput.click();
+        });
+
+        uploadInput.addEventListener('change', (e) => {
+            handleFileUpload(Array.from(e.target.files));
+        });
+
+        // Search events
+        searchBtn.addEventListener('click', executeSearch);
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                executeSearch();
+            }
+        });
+
+        // Theme toggle
+        themeToggle.addEventListener('click', toggleTheme);
+
+        // Documents panel events
+        docsBtn.addEventListener('click', openDocsPanel);
+        docsOverlay.addEventListener('click', closeDocsPanel);
+
+        // Modal close when clicking outside
+        document.getElementById('doc-viewer-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'doc-viewer-modal') {
+                closeDocumentViewer();
+            }
+        });
+
+        editModal.addEventListener('click', (e) => {
+            if (e.target.id === 'edit-modal') {
+                closeEditModal();
+            }
+        });
+
+        // ====================================================================
+        // INITIALIZATION
+        // ====================================================================
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTheme();
+            // Render any initial documents provided by server to avoid flash
+            if (window.__INITIAL_DOCS__ && Array.isArray(window.__INITIAL_DOCS__) && window.__INITIAL_DOCS__.length > 0) {
+                renderInitialDocuments(window.__INITIAL_DOCS__);
+            } else {
+                // Show loading badge state before fetching
+                docCountBadge.textContent = '—';
+            }
+
+            // Always refresh from API in background to ensure latest state
+            updateDocumentCount();
+            loadDocumentsList();
+        });
+    </script>
+</body>
+</html>
