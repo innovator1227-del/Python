@@ -59,6 +59,7 @@ class SearchEngine:
         self.document_metadata: Dict[int, Dict[str, any]] = {}
         self.term_idf: Dict[str, float] = {}
         self.document_vectors: Dict[int, Dict[str, float]] = {}
+        self.inverted_index: Dict[str, Dict[int, int]] = {}
         self.document_count: int = 0
         self.processor: DocumentProcessor = DocumentProcessor()
         logger.info("SearchEngine initialized successfully")
@@ -167,7 +168,8 @@ class SearchEngine:
                         doc_vector[term] = tfidf
                 
                 self.document_vectors[doc_id] = doc_vector
-            
+
+            self.inverted_index = {term: dict(postings) for term, postings in inverted_index.items()}
             logger.info(f"Phase 3 complete: TF-IDF vectors built for all {self.document_count} documents")
             logger.info(f"Index build complete. Index size: {len(self.term_idf)} terms, "
                        f"{len(self.document_vectors)} documents")
@@ -216,29 +218,55 @@ class SearchEngine:
             logger.info(f"Search initiated: '{query}'")
             
             # Phase 1: Preprocess query
-            query_tokens = self.processor.preprocess_text(query)
-            
-            if not query_tokens:
-                logger.warning(f"Query preprocessing returned no tokens: '{query}'")
-                return []
-            
-            logger.debug(f"Query tokens: {query_tokens}")
-            
-            # Phase 2: Calculate query TF-IDF vector
-            query_vector = self._calculate_query_vector(query_tokens)
-            logger.debug(f"Query vector size: {len(query_vector)} terms")
-            
-            # Phase 3: Calculate similarity scores for all documents
-            similarity_scores: Dict[int, float] = {}
-            
-            for doc_id, doc_vector in self.document_vectors.items():
-                similarity = self._cosine_similarity(query_vector, doc_vector)
-                if similarity > 0:
-                    similarity_scores[doc_id] = similarity
-            
-            if not similarity_scores:
-                logger.info("No matching documents found")
-                return []
+            if self._contains_boolean_operator(query):
+                matched_doc_ids = self._boolean_retrieve(query)
+                logger.debug(f"Boolean query matched documents: {matched_doc_ids}")
+                if not matched_doc_ids:
+                    logger.info(f"No documents matched boolean query: '{query}'")
+                    return []
+
+                query_tokens = self._extract_query_terms(query)
+                if not query_tokens:
+                    logger.warning(f"Boolean query contained no searchable terms after preprocessing: '{query}'")
+                    return []
+
+                query_vector = self._calculate_query_vector(query_tokens)
+                logger.debug(f"Boolean query tokens: {query_tokens}")
+
+                similarity_scores: Dict[int, float] = {}
+                for doc_id in matched_doc_ids:
+                    doc_vector = self.document_vectors.get(doc_id, {})
+                    similarity = self._cosine_similarity(query_vector, doc_vector)
+                    if similarity > 0:
+                        similarity_scores[doc_id] = similarity
+
+                if not similarity_scores:
+                    logger.info(f"Boolean query matched documents but no positive TF-IDF score found: '{query}'")
+                    return []
+            else:
+                query_tokens = self.processor.preprocess_text(query)
+                
+                if not query_tokens:
+                    logger.warning(f"Query preprocessing returned no tokens: '{query}'")
+                    return []
+                
+                logger.debug(f"Query tokens: {query_tokens}")
+                
+                # Phase 2: Calculate query TF-IDF vector
+                query_vector = self._calculate_query_vector(query_tokens)
+                logger.debug(f"Query vector size: {len(query_vector)} terms")
+                
+                # Phase 3: Calculate similarity scores for all documents
+                similarity_scores: Dict[int, float] = {}
+                
+                for doc_id, doc_vector in self.document_vectors.items():
+                    similarity = self._cosine_similarity(query_vector, doc_vector)
+                    if similarity > 0:
+                        similarity_scores[doc_id] = similarity
+
+                if not similarity_scores:
+                    logger.info("No matching documents found")
+                    return []
             
             logger.info(f"Computed similarities for {len(similarity_scores)} relevant documents")
             
@@ -290,6 +318,98 @@ class SearchEngine:
         except Exception as e:
             logger.error(f"Error calculating query vector: {str(e)}")
             raise RuntimeError(f"Query vector calculation failed: {str(e)}")
+
+    def _contains_boolean_operator(self, query: str) -> bool:
+        """Check whether the raw query contains Boolean operators."""
+        return bool(re.search(r"\b(?:AND|OR)\b", query, flags=re.IGNORECASE))
+
+    def _extract_query_terms(self, query: str) -> List[str]:
+        """Extract searchable terms from a query, removing Boolean operators."""
+        # Preprocess the raw query text; stop words and operators are removed automatically.
+        return self.processor.preprocess_text(query)
+
+    def _boolean_retrieve(self, query: str) -> Set[int]:
+        """Parse a Boolean query and compute exact document matches from posting lists."""
+        operands, operators = self._parse_boolean_query(query)
+        if not operands:
+            return set()
+
+        posting_sets = [self._posting_set_for_operand(op) for op in operands]
+        if any(not postings for postings in posting_sets):
+            return set()
+
+        return self._evaluate_boolean_expression(posting_sets, operators)
+
+    def _parse_boolean_query(self, query: str) -> Tuple[List[str], List[str]]:
+        """Split query into operand text fragments and Boolean operators."""
+        raw_tokens = re.findall(r"\b(?:AND|OR)\b|[^\s]+", query, flags=re.IGNORECASE)
+        operands: List[str] = []
+        operators: List[str] = []
+        current_operand: List[str] = []
+
+        for token in raw_tokens:
+            upper_token = token.upper()
+            if upper_token in {"AND", "OR"}:
+                if not current_operand:
+                    raise ValueError(f"Malformed Boolean query: '{query}'")
+                operands.append(" ".join(current_operand))
+                operators.append(upper_token)
+                current_operand = []
+            else:
+                current_operand.append(token)
+
+        if current_operand:
+            operands.append(" ".join(current_operand))
+
+        return operands, operators
+
+    def _posting_set_for_operand(self, operand: str) -> Set[int]:
+        """Return the set of documents matching a Boolean operand."""
+        tokens = self.processor.preprocess_text(operand)
+        if not tokens:
+            return set()
+
+        posting_set: Set[int] = set(self.inverted_index.get(tokens[0], {}).keys())
+        for token in tokens[1:]:
+            posting_set &= set(self.inverted_index.get(token, {}).keys())
+            if not posting_set:
+                break
+
+        return posting_set
+
+    def _evaluate_boolean_expression(self, posting_sets: List[Set[int]], operators: List[str]) -> Set[int]:
+        """Evaluate a Boolean expression with precedence: AND before OR."""
+        if not posting_sets:
+            return set()
+
+        precedence = {"AND": 2, "OR": 1}
+        values: List[Set[int]] = [posting_sets[0]]
+        op_stack: List[str] = []
+
+        for operator, posting_set in zip(operators, posting_sets[1:]):
+            while op_stack and precedence[op_stack[-1]] >= precedence[operator]:
+                right = values.pop()
+                left = values.pop()
+                op = op_stack.pop()
+                values.append(self._apply_boolean_operator(left, right, op))
+            op_stack.append(operator)
+            values.append(posting_set)
+
+        while op_stack:
+            right = values.pop()
+            left = values.pop()
+            op = op_stack.pop()
+            values.append(self._apply_boolean_operator(left, right, op))
+
+        return values[0] if values else set()
+
+    def _apply_boolean_operator(self, left: Set[int], right: Set[int], operator: str) -> Set[int]:
+        """Apply a Boolean operator to two posting sets."""
+        if operator == "AND":
+            return left & right
+        if operator == "OR":
+            return left | right
+        raise ValueError(f"Unsupported Boolean operator: {operator}")
     
     def _cosine_similarity(self, vector1: Dict[str, float], vector2: Dict[str, float]) -> float:
         """
@@ -485,7 +605,8 @@ class SearchEngine:
                 'document_metadata': self.document_metadata,
                 'term_idf': self.term_idf,
                 'document_vectors': self.document_vectors,
-                'document_count': self.document_count
+                'document_count': self.document_count,
+                'inverted_index': self.inverted_index
             }
             
             # Create parent directories if needed
@@ -546,6 +667,17 @@ class SearchEngine:
             # Convert document_vectors keys from strings to integers
             self.document_vectors = {int(k): v for k, v in index_data['document_vectors'].items()}
             self.document_count = index_data['document_count']
+            self.inverted_index = {
+                term: {int(doc_id): frequency for doc_id, frequency in postings.items()}
+                for term, postings in index_data.get('inverted_index', {}).items()
+            }
+
+            if not self.inverted_index:
+                logger.info("Reconstructing inverted index from loaded document vectors")
+                self.inverted_index = {}
+                for doc_id, vector in self.document_vectors.items():
+                    for term in vector.keys():
+                        self.inverted_index.setdefault(term, {})[doc_id] = 1
 
             # Repair inconsistent index state if metadata and vector storage differ
             metadata_ids = set(self.document_metadata.keys())
