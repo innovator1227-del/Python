@@ -446,8 +446,10 @@ def search_documents() -> Tuple[Dict[str, Any], int]:
         try:
             if search_type == 'boolean':
                 results = search_engine.search(query, top_k=top_k, search_type='boolean')
+                query_terms = search_engine._extract_query_terms(query)
             else:
                 results = search_engine.search(query, top_k=top_k, search_type='vector')
+                query_terms = search_engine.processor.preprocess_text(query)
         except Exception as e:
             logger.error(f"Search execution failed: {str(e)}")
             return jsonify({
@@ -455,18 +457,33 @@ def search_documents() -> Tuple[Dict[str, Any], int]:
                 'error': f'Search failed: {str(e)}'
             }), 500
         
-        # Format results for frontend
-        formatted_results = [
-            {
+        # Format results for frontend with TF-IDF metrics for query terms only
+        formatted_results = []
+        for result in results:
+            doc_id = result['doc_id']
+            doc_vector = search_engine.document_vectors.get(doc_id, {})
+            
+            query_term_metrics = []
+            for term in query_terms:
+                tfidf_weight = doc_vector.get(term, 0)
+                idf = search_engine.term_idf.get(term, 0)
+                tf = tfidf_weight / idf if idf > 0 else 0
+                query_term_metrics.append({
+                    'term': term,
+                    'tf': round(tf, 4),
+                    'idf': round(idf, 4),
+                    'tw': round(tfidf_weight, 4)
+                })
+            
+            formatted_results.append({
                 'rank': result['rank'],
                 'doc_id': result['doc_id'],
                 'title': result['title'],
                 'score': result['score'],
                 'score_percent': int(result['score'] * 100),
-                'snippet': result['snippet']
-            }
-            for result in results
-        ]
+                'snippet': result['snippet'],
+                'term_metrics': query_term_metrics
+            })
         
         execution_time = (time.time() - start_time) * 1000
         

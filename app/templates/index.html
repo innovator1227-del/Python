@@ -941,6 +941,66 @@
             background: rgba(100, 116, 139, 0.1);
         }
 
+        .term-metrics {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .term-metrics-toggle {
+            background: none;
+            border: none;
+            color: var(--primary-color);
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 0;
+            text-decoration: underline;
+        }
+
+        .term-metrics-toggle:hover {
+            opacity: 0.8;
+        }
+
+        .term-metrics-list {
+            margin-top: 0.75rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .term-card {
+            flex: 1;
+            min-width: 160px;
+            padding: 0.7rem;
+            background: var(--light-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        .term-card strong {
+            display: block;
+            color: var(--primary-color);
+            margin-bottom: 0.4rem;
+            word-break: break-word;
+        }
+
+        .term-metric-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.3rem;
+        }
+
+        .term-metric-label {
+            color: var(--text-secondary);
+        }
+
+        .term-metric-value {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
         .view-doc-btn {
             background: var(--primary-color);
             color: white;
@@ -1486,8 +1546,8 @@
                     >
                 </div>
                 <div class="search-mode-toggle" id="search-mode-toggle">
-                    <button type="button" class="toggle-btn active" id="vector-search-btn">Vector Model Search</button>
-                    <button type="button" class="toggle-btn" id="boolean-search-btn">Boolean Search</button>
+                    <button type="button" class="toggle-btn active" id="vector-search-btn" onclick="setSearchType('vector')">Vector Model Search</button>
+                    <button type="button" class="toggle-btn" id="boolean-search-btn" onclick="setSearchType('boolean')">Boolean Search</button>
                 </div>
                 <button class="search-btn" id="search-btn">
                     <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
@@ -1937,6 +1997,8 @@
                     resultsSection.style.display = 'block';
                     emptyState.style.display = 'none';
                 }
+
+                saveSearchState();
             } catch (error) {
                 showAlert('error', `Search error: ${error.message}`);
                 resultsSection.style.display = 'none';
@@ -1975,6 +2037,33 @@
                     
                     <div class="result-snippet">"${escapeHtml(result.snippet)}"</div>
                     
+                    ${result.term_metrics && result.term_metrics.length > 0 ? `
+                    <div class="term-metrics">
+                        <button class="term-metrics-toggle" onclick="toggleTermMetrics(${result.doc_id}, this)">
+                            📊 Show Query Term TF-IDF Metrics
+                        </button>
+                        <div class="term-metrics-list" id="metrics-${result.doc_id}" style="display: none;">
+                            ${result.term_metrics.map(tm => `
+                                <div class="term-card">
+                                    <strong>${escapeHtml(tm.term)}</strong>
+                                    <div class="term-metric-row">
+                                        <span class="term-metric-label">TF:</span>
+                                        <span class="term-metric-value">${tm.tf}</span>
+                                    </div>
+                                    <div class="term-metric-row">
+                                        <span class="term-metric-label">IDF:</span>
+                                        <span class="term-metric-value">${tm.idf}</span>
+                                    </div>
+                                    <div class="term-metric-row">
+                                        <span class="term-metric-label">TW:</span>
+                                        <span class="term-metric-value">${tm.tw}</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    ` : ''}
+                    
                     <button class="view-doc-btn" onclick="viewDocument(${result.doc_id}, '${escapeHtml(result.title).replace(/'/g, "\\'")}')">
                         View Document &rarr;
                     </button>
@@ -1984,14 +2073,76 @@
             showProfessorMode(results.length > 0);
         }
 
+        function toggleTermMetrics(docId, button) {
+            const metricsDiv = document.getElementById(`metrics-${docId}`);
+            if (metricsDiv.style.display === 'none') {
+                metricsDiv.style.display = 'flex';
+                button.textContent = '📊 Hide Query Term TF-IDF Metrics';
+            } else {
+                metricsDiv.style.display = 'none';
+                button.textContent = '📊 Show Query Term TF-IDF Metrics';
+            }
+        }
+
         function setSearchType(type) {
             state.searchType = type;
+
+            const vectorBtn = document.getElementById('vector-search-btn');
+            const booleanBtn = document.getElementById('boolean-search-btn');
+
             if (type === 'vector') {
-                vectorSearchBtn.classList.add('active');
-                booleanSearchBtn.classList.remove('active');
+                vectorBtn?.classList.add('active');
+                booleanBtn?.classList.remove('active');
             } else {
-                booleanSearchBtn.classList.add('active');
-                vectorSearchBtn.classList.remove('active');
+                booleanBtn?.classList.add('active');
+                vectorBtn?.classList.remove('active');
+            }
+
+            saveSearchState();
+
+            if (searchInput.value.trim() && !state.isSearching) {
+                executeSearch();
+            }
+        }
+
+        function saveSearchState() {
+            const searchState = {
+                query: searchInput.value.trim(),
+                searchType: state.searchType,
+                results: state.currentResults || [],
+                relevantIds: Array.from(document.querySelectorAll('.relevance-checkbox:checked')).map(checkbox => parseInt(checkbox.dataset.docId, 10))
+            };
+            try {
+                localStorage.setItem('searchState', JSON.stringify(searchState));
+            } catch (error) {
+                console.warn('Unable to save search state:', error);
+            }
+        }
+
+        function loadSearchState() {
+            try {
+                const raw = localStorage.getItem('searchState');
+                if (!raw) return;
+
+                const saved = JSON.parse(raw);
+                if (!saved || !Array.isArray(saved.results) || saved.results.length === 0) return;
+
+                searchInput.value = saved.query || '';
+                setSearchType(saved.searchType || 'vector');
+                state.currentResults = saved.results;
+
+                displayResults(saved.results, saved.query || '', 0);
+                resultsSection.style.display = 'block';
+                emptyState.style.display = 'none';
+
+                if (Array.isArray(saved.relevantIds) && saved.relevantIds.length > 0) {
+                    saved.relevantIds.forEach(docId => {
+                        const checkbox = document.querySelector(`.relevance-checkbox[data-doc-id="${docId}"]`);
+                        if (checkbox) checkbox.checked = true;
+                    });
+                }
+            } catch (error) {
+                console.warn('Unable to load saved search state:', error);
             }
         }
 
@@ -2044,11 +2195,26 @@
                     return;
                 }
 
+                // Calculate relevant_retrieved count
+                const relevantRetrieved = retrievedIds.filter(id => selectedRelevant.includes(id)).length;
+
                 precisionValue.textContent = `${data.precision}%`;
                 recallValue.textContent = `${data.recall}%`;
                 f1Value.textContent = `${data.f1_score}%`;
                 professorMetrics.style.display = 'grid';
-                evaluationMessage.textContent = `Evaluation completed for ${data.retrieved_count} retrieved documents.`;
+                
+                // Enhanced message with calculation breakdown
+                const precisionCalc = `${relevantRetrieved}/${data.retrieved_count}`;
+                const recallCalc = `${relevantRetrieved}/${data.relevant_count}`;
+                evaluationMessage.innerHTML = `
+                    <div style="text-align: center; line-height: 1.8;">
+                        <strong>Evaluation completed</strong><br>
+                        <small style="color: var(--text-secondary);">
+                            Precision = ${precisionCalc} documents correctly identified<br>
+                            Recall = ${recallCalc} of all relevant documents found
+                        </small>
+                    </div>
+                `;
                 showAlert('success', 'Effectiveness calculated successfully');
             } catch (error) {
                 showAlert('error', `Evaluation error: ${error.message}`);
@@ -2446,8 +2612,11 @@
             if (window.__INITIAL_DOCS__ && Array.isArray(window.__INITIAL_DOCS__) && window.__INITIAL_DOCS__.length > 0) {
                 renderInitialDocuments(window.__INITIAL_DOCS__);
             } else {
-                // Show loading badge state before fetching
-                docCountBadge.textContent = '—';
+                // Try to restore the last search from localStorage
+                loadSearchState();
+                if (!state.currentResults || state.currentResults.length === 0) {
+                    docCountBadge.textContent = '—';
+                }
             }
 
             // Always refresh from API in background to ensure latest state
