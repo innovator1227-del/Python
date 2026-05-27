@@ -181,20 +181,21 @@ class SearchEngine:
             logger.error(f"Unexpected error during index build: {str(e)}")
             raise RuntimeError(f"Index build failed: {str(e)}")
     
-    def search(self, query: str, top_k: int = 10) -> List[Dict]:
+    def search(self, query: str, top_k: int = 10, search_type: str = 'vector') -> List[Dict]:
         """
         Execute a search query and return ranked results.
         
         Processing pipeline:
         1. Preprocess query using DocumentProcessor
         2. Calculate query TF-IDF vector
-        3. Compute cosine similarity with all document vectors
+        3. Compute cosine similarity with selected documents
         4. Rank results by relevance score
         5. Extract text snippets for preview
         
         Args:
             query (str): User search query
             top_k (int): Number of top results to return (default: 10)
+            search_type (str): Search mode, either 'vector' or 'boolean'
             
         Returns:
             List[Dict]: List of ranked search results, each containing:
@@ -215,10 +216,12 @@ class SearchEngine:
             if not self.document_vectors:
                 raise ValueError("Search index not built. Call build_index() first.")
             
-            logger.info(f"Search initiated: '{query}'")
-            
-            # Phase 1: Preprocess query
-            if self._contains_boolean_operator(query):
+            if search_type not in {'vector', 'boolean'}:
+                raise ValueError("search_type must be 'vector' or 'boolean'")
+
+            logger.info(f"Search initiated: '{query}' [type={search_type}]")
+
+            if search_type == 'boolean':
                 matched_doc_ids = self._boolean_retrieve(query)
                 logger.debug(f"Boolean query matched documents: {matched_doc_ids}")
                 if not matched_doc_ids:
@@ -252,13 +255,10 @@ class SearchEngine:
                 
                 logger.debug(f"Query tokens: {query_tokens}")
                 
-                # Phase 2: Calculate query TF-IDF vector
                 query_vector = self._calculate_query_vector(query_tokens)
                 logger.debug(f"Query vector size: {len(query_vector)} terms")
                 
-                # Phase 3: Calculate similarity scores for all documents
                 similarity_scores: Dict[int, float] = {}
-                
                 for doc_id, doc_vector in self.document_vectors.items():
                     similarity = self._cosine_similarity(query_vector, doc_vector)
                     if similarity > 0:
@@ -270,7 +270,6 @@ class SearchEngine:
             
             logger.info(f"Computed similarities for {len(similarity_scores)} relevant documents")
             
-            # Phase 4: Rank and format results
             results = self._rank_results(similarity_scores, query_tokens, top_k)
             logger.info(f"Search complete: {len(results)} results returned (requested top {top_k})")
             
@@ -282,6 +281,14 @@ class SearchEngine:
         except Exception as e:
             logger.error(f"Unexpected error during search: {str(e)}")
             raise RuntimeError(f"Search failed: {str(e)}")
+
+    def search_vector(self, query: str, top_k: int = 10) -> List[Dict]:
+        """Search using the Vector Space Model."""
+        return self.search(query, top_k=top_k, search_type='vector')
+
+    def search_boolean(self, query: str, top_k: int = 10) -> List[Dict]:
+        """Search using Boolean retrieval on the inverted index."""
+        return self.search(query, top_k=top_k, search_type='boolean')
     
     def _calculate_query_vector(self, query_tokens: List[str]) -> Dict[str, float]:
         """

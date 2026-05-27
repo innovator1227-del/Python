@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.preprocessor import DocumentProcessor
 from core.ranker import SearchEngine
+from core.evaluator import IREvaluator
 
 
 # Configure logging
@@ -409,6 +410,7 @@ def search_documents() -> Tuple[Dict[str, Any], int]:
             }), 400
         
         query = data.get('query', '').strip()
+        search_type = str(data.get('search_type', 'vector')).lower()
         top_k = data.get('top_k', 10)
         
         if not query:
@@ -416,6 +418,13 @@ def search_documents() -> Tuple[Dict[str, Any], int]:
             return jsonify({
                 'success': False,
                 'error': 'Query cannot be empty'
+            }), 400
+        
+        if search_type not in {'vector', 'boolean'}:
+            logger.warning(f"Invalid search_type: {search_type}")
+            return jsonify({
+                'success': False,
+                'error': "search_type must be either 'vector' or 'boolean'"
             }), 400
         
         if not isinstance(top_k, int) or top_k < 1 or top_k > 100:
@@ -427,6 +436,7 @@ def search_documents() -> Tuple[Dict[str, Any], int]:
             return jsonify({
                 'success': True,
                 'query': query,
+                'search_type': search_type,
                 'results': [],
                 'total_results': 0,
                 'message': 'No documents indexed yet. Please upload documents first.'
@@ -434,7 +444,10 @@ def search_documents() -> Tuple[Dict[str, Any], int]:
         
         # Execute search
         try:
-            results = search_engine.search(query, top_k=top_k)
+            if search_type == 'boolean':
+                results = search_engine.search(query, top_k=top_k, search_type='boolean')
+            else:
+                results = search_engine.search(query, top_k=top_k, search_type='vector')
         except Exception as e:
             logger.error(f"Search execution failed: {str(e)}")
             return jsonify({
@@ -463,6 +476,7 @@ def search_documents() -> Tuple[Dict[str, Any], int]:
         return jsonify({
             'success': True,
             'query': query,
+            'search_type': search_type,
             'results': formatted_results,
             'total_results': len(formatted_results),
             'execution_time_ms': round(execution_time, 2)
@@ -474,6 +488,51 @@ def search_documents() -> Tuple[Dict[str, Any], int]:
             'success': False,
             'error': f'Server error: {str(e)}'
         }), 500
+
+
+@app.route('/api/evaluate', methods=['POST'])
+def evaluate_search() -> Tuple[Dict[str, Any], int]:
+    """Evaluate retrieved document IDs against user-selected relevance judgments."""
+    try:
+        data = request.get_json()
+        if not data:
+            logger.warning("Evaluation request missing JSON payload")
+            return jsonify({'success': False, 'error': 'JSON payload is required'}), 400
+
+        query = str(data.get('query', '')).strip()
+        retrieved_ids = data.get('retrieved_ids')
+        relevant_ids = data.get('relevant_ids')
+
+        if query == '':
+            logger.warning("Evaluation request missing query")
+            return jsonify({'success': False, 'error': 'Query is required for evaluation'}), 400
+
+        if not isinstance(retrieved_ids, list) or not isinstance(relevant_ids, list):
+            logger.warning("Evaluation request contains invalid id lists")
+            return jsonify({'success': False, 'error': 'retrieved_ids and relevant_ids must be arrays'}), 400
+
+        try:
+            retrieved_ids = [int(doc_id) for doc_id in retrieved_ids]
+            relevant_ids = [int(doc_id) for doc_id in relevant_ids]
+        except (TypeError, ValueError):
+            logger.warning("Evaluation request contains non-integer document IDs")
+            return jsonify({'success': False, 'error': 'Document IDs must be integers'}), 400
+
+        metrics = IREvaluator.evaluate(retrieved_ids, relevant_ids)
+
+        return jsonify({
+            'success': True,
+            'query': query,
+            'precision': round(metrics['precision'] * 100, 2),
+            'recall': round(metrics['recall'] * 100, 2),
+            'f1_score': round(metrics['f1_score'] * 100, 2),
+            'retrieved_count': len(retrieved_ids),
+            'relevant_count': len(relevant_ids)
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Evaluation failed: {str(e)}")
+        return jsonify({'success': False, 'error': f'Evaluation failed: {str(e)}'}), 500
 
 
 @app.route('/api/stats', methods=['GET'])

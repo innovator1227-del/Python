@@ -709,6 +709,112 @@
             transform: none;
         }
 
+        .search-mode-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .toggle-btn {
+            padding: 0.9rem 1rem;
+            border-radius: 0.75rem;
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: var(--transition);
+            min-width: 135px;
+        }
+
+        .toggle-btn:hover,
+        .toggle-btn.active {
+            border-color: var(--primary-color);
+            background: var(--primary-color);
+            color: white;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .professor-panel {
+            margin-top: 1.5rem;
+            padding: 1.5rem;
+            border-radius: 1rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .professor-panel h4 {
+            margin-bottom: 0.75rem;
+            font-size: 1.1rem;
+            color: var(--text-primary);
+        }
+
+        .professor-description {
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .professor-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .evaluate-btn {
+            padding: 0.95rem 1.3rem;
+            border: none;
+            border-radius: 0.75rem;
+            background: var(--success-color);
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+            transition: var(--transition);
+        }
+
+        .evaluate-btn:hover {
+            background: #15803d;
+            transform: translateY(-1px);
+        }
+
+        .professor-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+        }
+
+        .metric-card {
+            padding: 1rem;
+            border-radius: 0.85rem;
+            background: var(--light-bg);
+            border: 1px solid var(--border-color);
+            text-align: center;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .metric-card strong {
+            display: block;
+            margin-top: 0.5rem;
+            font-size: 1.5rem;
+            color: var(--primary-color);
+        }
+
+        .result-checkbox {
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .result-checkbox input {
+            width: 1rem;
+            height: 1rem;
+            accent-color: var(--primary-color);
+        }
+
         /* ====================================================================
            RESULTS SECTION
            ==================================================================== */
@@ -1379,6 +1485,10 @@
                         placeholder="Search documents... (e.g., 'annual report 2024', 'project status')"
                     >
                 </div>
+                <div class="search-mode-toggle" id="search-mode-toggle">
+                    <button type="button" class="toggle-btn active" id="vector-search-btn">Vector Model Search</button>
+                    <button type="button" class="toggle-btn" id="boolean-search-btn">Boolean Search</button>
+                </div>
                 <button class="search-btn" id="search-btn">
                     <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -1407,6 +1517,29 @@
                 </div>
             </div>
             <div class="results-grid" id="results-grid"></div>
+        </div>
+
+        <div class="professor-panel" id="professor-panel" style="display: none;">
+            <h4>Professor Presentation Mode</h4>
+            <p class="professor-description">Mark the documents that are actually relevant, then calculate retrieval effectiveness for this query.</p>
+            <div class="professor-actions">
+                <button class="evaluate-btn" id="evaluate-btn">Calculate Effectiveness</button>
+                <span id="evaluation-message" style="color: var(--text-secondary); font-size: 0.95rem;"></span>
+            </div>
+            <div class="professor-metrics" id="professor-metrics" style="display: none;">
+                <div class="metric-card">
+                    <span>Precision</span>
+                    <strong id="precision-value">--</strong>
+                </div>
+                <div class="metric-card">
+                    <span>Recall</span>
+                    <strong id="recall-value">--</strong>
+                </div>
+                <div class="metric-card">
+                    <span>F1 Score</span>
+                    <strong id="f1-value">--</strong>
+                </div>
+            </div>
         </div>
 
         <!-- Empty State -->
@@ -1472,7 +1605,8 @@
             isSearching: false,
             isUploading: false,
             currentResults: [],
-            documentCount: 0
+            documentCount: 0,
+            searchType: 'vector'
         };
 
         // ====================================================================
@@ -1497,6 +1631,15 @@
         const errorAlert = document.getElementById('error-alert');
         const successAlert = document.getElementById('success-alert');
         const infoAlert = document.getElementById('info-alert');
+        const vectorSearchBtn = document.getElementById('vector-search-btn');
+        const booleanSearchBtn = document.getElementById('boolean-search-btn');
+        const evaluateBtn = document.getElementById('evaluate-btn');
+        const professorPanel = document.getElementById('professor-panel');
+        const professorMetrics = document.getElementById('professor-metrics');
+        const precisionValue = document.getElementById('precision-value');
+        const recallValue = document.getElementById('recall-value');
+        const f1Value = document.getElementById('f1-value');
+        const evaluationMessage = document.getElementById('evaluation-message');
 
         // Documents panel references
         const docsBtn = document.getElementById('docs-btn');
@@ -1768,6 +1911,7 @@
                     },
                     body: JSON.stringify({
                         query: query,
+                        search_type: state.searchType,
                         top_k: 20
                     })
                 });
@@ -1787,6 +1931,7 @@
                     showAlert('info', 'No matching documents found for your query');
                     resultsSection.style.display = 'none';
                     emptyState.style.display = 'block';
+                    showProfessorMode(false);
                 } else {
                     displayResults(data.results, data.query, data.execution_time_ms);
                     resultsSection.style.display = 'block';
@@ -1796,6 +1941,7 @@
                 showAlert('error', `Search error: ${error.message}`);
                 resultsSection.style.display = 'none';
                 emptyState.style.display = 'block';
+                showProfessorMode(false);
             } finally {
                 setLoading(false);
                 state.isSearching = false;
@@ -1811,6 +1957,10 @@
 
             resultsGrid.innerHTML = results.map(result => `
                 <div class="result-card">
+                    <div class="result-checkbox">
+                        <input id="relevance-${result.doc_id}" type="checkbox" class="relevance-checkbox" data-doc-id="${result.doc_id}">
+                        <label for="relevance-${result.doc_id}">Mark as relevant</label>
+                    </div>
                     <div class="result-rank">#${result.rank}</div>
                     
                     <div class="result-title">${escapeHtml(result.title)}</div>
@@ -1830,6 +1980,81 @@
                     </button>
                 </div>
             `).join('');
+
+            showProfessorMode(results.length > 0);
+        }
+
+        function setSearchType(type) {
+            state.searchType = type;
+            if (type === 'vector') {
+                vectorSearchBtn.classList.add('active');
+                booleanSearchBtn.classList.remove('active');
+            } else {
+                booleanSearchBtn.classList.add('active');
+                vectorSearchBtn.classList.remove('active');
+            }
+        }
+
+        function showProfessorMode(isVisible) {
+            if (isVisible) {
+                professorPanel.style.display = 'block';
+                professorMetrics.style.display = 'none';
+                evaluationMessage.textContent = 'Select relevant documents from the results above and calculate effectiveness.';
+            } else {
+                professorPanel.style.display = 'none';
+                evaluationMessage.textContent = '';
+            }
+        }
+
+        async function evaluateProfessorMode() {
+            const currentResults = state.currentResults || [];
+            if (!currentResults.length) {
+                showAlert('info', 'There are no search results to evaluate.');
+                return;
+            }
+
+            const retrievedIds = currentResults.map(result => result.doc_id);
+            const selectedRelevant = Array.from(document.querySelectorAll('.relevance-checkbox:checked'))
+                .map(checkbox => parseInt(checkbox.dataset.docId, 10));
+
+            if (!selectedRelevant.length) {
+                showAlert('error', 'Please select at least one relevant document before calculating effectiveness.');
+                return;
+            }
+
+            setLoading(true, 'Calculating effectiveness...');
+            clearAlerts();
+
+            try {
+                const response = await fetch(`${API_BASE}/evaluate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: searchInput.value.trim(),
+                        retrieved_ids: retrievedIds,
+                        relevant_ids: selectedRelevant
+                    })
+                });
+
+                const data = await response.json();
+                if (!data.success) {
+                    showAlert('error', data.error || 'Evaluation failed');
+                    return;
+                }
+
+                precisionValue.textContent = `${data.precision}%`;
+                recallValue.textContent = `${data.recall}%`;
+                f1Value.textContent = `${data.f1_score}%`;
+                professorMetrics.style.display = 'grid';
+                evaluationMessage.textContent = `Evaluation completed for ${data.retrieved_count} retrieved documents.`;
+                showAlert('success', 'Effectiveness calculated successfully');
+            } catch (error) {
+                showAlert('error', `Evaluation error: ${error.message}`);
+            } finally {
+                setLoading(false);
+            }
         }
 
         /**
@@ -2187,6 +2412,9 @@
                 executeSearch();
             }
         });
+        vectorSearchBtn.addEventListener('click', () => setSearchType('vector'));
+        booleanSearchBtn.addEventListener('click', () => setSearchType('boolean'));
+        evaluateBtn.addEventListener('click', evaluateProfessorMode);
 
         // Theme toggle
         themeToggle.addEventListener('click', toggleTheme);
